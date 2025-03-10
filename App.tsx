@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, StatusBar, StyleSheet, Text, View, TouchableOpacity, Image } from 'react-native';
+import { ScrollView, StatusBar, StyleSheet, Text, View, TouchableOpacity, Image, Alert } from 'react-native';
 import { useColorScheme } from 'react-native';
-import { Colors } from 'react-native/Libraries/NewAppScreen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const App = () => {
   const isDarkMode = useColorScheme() === 'dark';
   const [streak, setStreak] = useState(0); // Streak counter
-  const [lastUpdated, setLastUpdated] = useState(null); // Track the last updated date
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null); // Track the last updated date
 
   const backgroundStyle = {
     backgroundColor: isDarkMode ? '#1E1E1E' : '#F5F5F5',
@@ -18,27 +18,80 @@ const App = () => {
 
   const cardBackground = isDarkMode ? '#2C2C2C' : '#FFFFFF';
 
-  // Function to increment the streak
-  const incrementStreak = () => {
-    const today = new Date().toDateString();
-    if (lastUpdated !== today) {
-      setStreak((prevStreak) => prevStreak + 1);
-      setLastUpdated(today);
-    }
-  };
+  // Load streak and lastUpdated from AsyncStorage on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const savedStreak = await AsyncStorage.getItem('streak');
+        const savedLastUpdated = await AsyncStorage.getItem('lastUpdated');
+        if (savedStreak !== null) setStreak(Number(savedStreak));
+        if (savedLastUpdated !== null) setLastUpdated(savedLastUpdated);
+      } catch (error) {
+        console.error('Failed to load data', error);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Save streak and lastUpdated to AsyncStorage whenever they change
+  useEffect(() => {
+    const saveData = async () => {
+      try {
+        await AsyncStorage.setItem('streak', streak.toString());
+        await AsyncStorage.setItem('lastUpdated', lastUpdated || '');
+      } catch (error) {
+        console.error('Failed to save data', error);
+      }
+    };
+
+    saveData();
+  }, [streak, lastUpdated]);
+
+  // Automatically increment the streak if the day has changed
+  useEffect(() => {
+    const checkAndUpdateStreak = () => {
+      const today = new Date().toDateString();
+      if (lastUpdated !== today) {
+        setStreak((prevStreak) => prevStreak + 1);
+        setLastUpdated(today);
+      }
+    };
+
+    checkAndUpdateStreak();
+  }, [lastUpdated]);
 
   // Developer function to manually increase the streak
   const incrementDayManually = () => {
     setStreak((prevStreak) => prevStreak + 1);
   };
 
-  // Reset streak if the user misses a day
-  useEffect(() => {
-    const today = new Date().toDateString();
-    if (lastUpdated && lastUpdated !== today) {
-      setStreak(0);
-    }
-  }, [lastUpdated]);
+  // Function to reset the streak
+  const resetStreak = () => {
+    const motivationalMessages = [
+      "Loser! You're not getting anywhere like this.",
+      "Is this all you've got? Pathetic.",
+      "You call that effort? Try harder!",
+      "Success doesn't come to quitters. Get back on track!",
+      "You're better than this. Don't give up now!",
+    ];
+    const randomMessage = motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)];
+  
+    Alert.alert(
+      "Streak Reset",
+      randomMessage,
+      [
+        {
+          text: "I'll do better",
+          onPress: () => {
+            const today = new Date().toDateString(); // Get today's date
+            setStreak(0);
+            setLastUpdated(today); // Set lastUpdated to today's date
+          },
+        },
+      ]
+    );
+  };
 
   // Effects based on streak days
   const getEffectsForStreak = () => {
@@ -123,12 +176,12 @@ const App = () => {
           title: 'Day 15: A New You',
           description: 'Congratulations! You’ve reached halfway through the month. Your confidence, focus, and energy are at their peak. Keep building on this foundation.',
         };
-            case 14:
+      case 16:
         return {
           title: 'Day 14: Mental Clarity',
           description: 'Your mind feels sharper, and you’re more productive. You’re starting to see the benefits of your discipline.',
         };
-      case 15:
+      case 17:
         return {
           title: 'Day 15: A New You',
           description: 'Congratulations! You’ve reached halfway through the month. Your confidence, focus, and energy are at their peak. Keep building on this foundation.',
@@ -171,9 +224,9 @@ const App = () => {
           <Text style={[styles.effectDescription, textStyle]}>{effects.description}</Text>
         </View>
 
-        {/* Action Button */}
-        <TouchableOpacity style={styles.button} onPress={incrementDayManually}>
-          <Text style={styles.buttonText}>I Did It Today!</Text>
+        {/* Reset Button */}
+        <TouchableOpacity style={styles.resetButton} onPress={resetStreak}>
+          <Text style={styles.resetButtonText}>Reset Streak</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -182,10 +235,10 @@ const App = () => {
         <TouchableOpacity style={styles.navItem} onPress={incrementDayManually}>
           <Text style={[styles.navText, textStyle]}>Home</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={incrementDayManually}>
+        <TouchableOpacity style={styles.navItem}>
           <Text style={[styles.navText, textStyle]}>Profile</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={incrementDayManually}>
+        <TouchableOpacity style={styles.navItem}>
           <Text style={[styles.navText, textStyle]}>Settings</Text>
         </TouchableOpacity>
       </View>
@@ -274,28 +327,15 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 15,
   },
-  button: {
-    backgroundColor: '#007ACC',
+  resetButton: {
+    backgroundColor: '#FF5733',
     paddingHorizontal: 20,
     paddingVertical: 15,
     borderRadius: 10,
     alignItems: 'center',
     marginBottom: 10,
   },
-  developerButton: {
-    backgroundColor: '#FF5733',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  developerButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  buttonText: {
+  resetButtonText: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
